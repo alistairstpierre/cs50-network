@@ -1,0 +1,27 @@
+{% extends "network/layout.html" %}
+{% load static %}
+
+{% block body %}
+    <h1 id="page-title"></h1>
+
+    <div id="profile-view">
+        
+    </div>
+
+    <div id="all-posts-view">
+        <div id="form-container" class="m-2 p-3 border rounded">
+            <form id="post-form">
+                <textarea id="compose-post"></textarea>
+                <input type="submit" class="btn btn-primary post-btn btn-sm" id="post" value="Post"/>
+            </form>
+        </div>
+    </div>
+
+    <div id="following-view">
+
+    </div>
+{% endblock %}
+
+{% block script %}
+    <script src="{% static 'network/posts.js' %}"></script>
+{% endblock %}

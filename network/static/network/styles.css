@@ -1,0 +1,9 @@
+#post-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.post-btn {
+    width: 50px;
+}
