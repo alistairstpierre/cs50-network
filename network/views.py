@@ -1,3 +1,4 @@
+import profile
 from django.contrib.auth import authenticate, login, logout
 from django.db import IntegrityError
 from django.http import HttpResponse, HttpResponseRedirect
@@ -8,7 +9,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 import json
 
-from .models import User, Post
+from .models import Follow, User, Post
 
 
 def index(request):
@@ -19,6 +20,60 @@ def index(request):
     # Everyone else is prompted to sign in
     else:
         return HttpResponseRedirect(reverse("login"))
+
+
+@csrf_exempt
+@login_required
+def follow(request, id):
+    print("follow")
+    current_user = request.user
+    print(f"current user: {current_user.username}")
+    requested_user = current_user if id == -1 else User.objects.get(id=id)
+    is_following = Follow.objects.filter(user=requested_user, follower_id=current_user.id).exists()
+    if is_following:
+        print(f"{current_user.username} is not longer following {requested_user.username}")
+        Follow.objects.filter(user=requested_user, follower_id=current_user.id)[0].delete()
+    else:
+        print(f"{current_user.username} is now following {requested_user.username}")
+        entry = Follow(
+            follower_id = current_user.id, 
+            user = requested_user
+        )
+        entry.save()
+    is_following = not is_following
+    num_following = Follow.objects.filter(follower_id=current_user.id).count()
+
+    r = {
+        "following_count": num_following,
+        "is_following" : is_following
+    }
+    return JsonResponse(r, safe=False)
+
+
+@csrf_exempt
+@login_required
+def get_profile(request, id):
+    print("get profile")
+    current_user = request.user
+    requested_user = User.objects.get(id=id)
+    num_followers = Follow.objects.filter(follower_id=requested_user.id).count()
+    num_following = Follow.objects.filter(user=requested_user).count()
+    posts = Post.objects.filter(user=requested_user)
+    posts = posts.order_by("-updated_at").all()
+    posts = [post.serialize() for post in posts]
+    is_user = True if current_user.id == requested_user.id else False
+    is_following = False
+    if is_user == False:
+        is_following = Follow.objects.filter(user=requested_user, follower_id=current_user.id).exists()
+    profile = {
+        "followers": num_followers,
+        "following": num_following,
+        "posts": posts,
+        "is_user": is_user,
+        "is_following": is_following
+    }
+    
+    return JsonResponse(profile, safe=False)
 
 
 @csrf_exempt
@@ -36,7 +91,7 @@ def make_post(request):
 
     # Create and save post
     entry = Post(
-        user=request.user,
+        user=User.objects.get(username=request.user.username),
         post=post
     )
     entry.save()
@@ -45,12 +100,17 @@ def make_post(request):
 
 
 def get_posts(request, id):
-    posts = Post.objects.all()
+    if(id == 0):
+        posts = Post.objects.all()
+    else: 
+        following = Follow.objects.filter(follower_id=id)
+        users = [user.user.id for user in following]
+        posts = Post.objects.filter(user__in=users)
     # else:
     #     return JsonResponse({"error": "Invalid mailbox."}, status=400)
 
     # Return emails in reverse chronologial order
-    posts = posts.order_by("-timestamp").all()
+    posts = posts.order_by("-updated_at").all()
     return JsonResponse([post.serialize() for post in posts], safe=False)
 
 

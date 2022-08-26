@@ -1,4 +1,5 @@
 {% load static %}
+{{ request.user.id|json_script:"user_id" }}
 
 <!DOCTYPE html>
 <html lang="en">

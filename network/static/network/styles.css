@@ -7,3 +7,16 @@
 .post-btn {
     width: 50px;
 }
+
+.post-btn {
+    width: 100px;
+}
+
+img {
+    width: 25px;
+    height: 25px;
+}
+
+.likes {
+    display: flex;
+}
