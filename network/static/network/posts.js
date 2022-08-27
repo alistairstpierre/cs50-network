@@ -26,8 +26,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     fetch(`/get_posts/0`)
       .then(response => response.json())
-      .then(posts => {
-          posts.forEach(post => {
+      .then(data => {
+          data.object_list.forEach(post => {
             all_posts.innerHTML += 
             `
               <div class="border border-secondary rounded p-3 m-2"> 

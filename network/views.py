@@ -1,4 +1,4 @@
-import profile
+import json
 from django.contrib.auth import authenticate, login, logout
 from django.db import IntegrityError
 from django.http import HttpResponse, HttpResponseRedirect
@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-import json
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 from .models import Follow, User, Post
 
@@ -106,12 +106,21 @@ def get_posts(request, id):
         following = Follow.objects.filter(follower_id=id)
         users = [user.user.id for user in following]
         posts = Post.objects.filter(user__in=users)
-    # else:
-    #     return JsonResponse({"error": "Invalid mailbox."}, status=400)
 
-    # Return emails in reverse chronologial order
     posts = posts.order_by("-updated_at").all()
-    return JsonResponse([post.serialize() for post in posts], safe=False)
+    posts = [post.serialize() for post in posts]
+
+    page = request.GET.get('page', 1)
+
+    paginator = Paginator(posts, 10)
+    try:
+        data = paginator.page(page)
+    except PageNotAnInteger:
+        data = paginator.page(1)
+    except EmptyPage:
+        data = paginator.page(paginator.num_pages)
+
+    return JsonResponse(data, safe=False)
 
 
 def login_view(request):
