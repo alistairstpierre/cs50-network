@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import json
 from django.contrib.auth import authenticate, login, logout
 from django.db import IntegrityError
@@ -99,6 +100,42 @@ def make_post(request):
     return JsonResponse({"message": "Email sent successfully."}, status=201)
 
 
+class ViewPaginatorMixin(object):
+    min_limit = 1
+    max_limit = 10
+
+    def paginate(self, object_list, page=1, limit=10, **kwargs):
+        try:
+            page = int(page)
+            if page < 1:
+                page = 1
+        except (TypeError, ValueError):
+            page = 1
+
+        try:
+            limit = int(limit)
+            if limit < self.min_limit:
+                limit = self.min_limit
+            if limit > self.max_limit:
+                limit = self.max_limit
+        except (ValueError, TypeError):
+            limit = self.max_limit
+
+        paginator = Paginator(object_list, limit)
+        try:
+            objects = paginator.page(page)
+        except PageNotAnInteger:
+            objects = paginator.page(1)
+        except EmptyPage:
+            objects = paginator.page(paginator.num_pages)
+        data = {
+            'previous_page': objects.has_previous() and objects.previous_page_number() or None,
+            'next_page': objects.has_next() and objects.next_page_number() or None,
+            'data': list(objects)
+        }
+        return data
+
+
 def get_posts(request, id):
     if(id == 0):
         posts = Post.objects.all()
@@ -114,11 +151,23 @@ def get_posts(request, id):
 
     paginator = Paginator(posts, 10)
     try:
-        data = paginator.page(page)
+        objects = paginator.page(page)
     except PageNotAnInteger:
-        data = paginator.page(1)
+        objects = paginator.page(1)
     except EmptyPage:
-        data = paginator.page(paginator.num_pages)
+        objects = paginator.page(paginator.num_pages)
+
+    data = {
+        'has_previous': objects.has_previous(),
+        'has_next': objects.has_next(),
+        'previous_page': objects.has_previous() and objects.previous_page_number() or None,
+        'next_page': objects.has_next() and objects.next_page_number() or None,
+        'current_page': objects.number,
+        'num_pages': objects.paginator.num_pages,
+        'data': list(objects)
+    }
+
+    print(data)
 
     return JsonResponse(data, safe=False)
 

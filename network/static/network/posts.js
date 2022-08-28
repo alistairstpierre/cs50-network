@@ -14,6 +14,27 @@ document.addEventListener('DOMContentLoaded', function() {
     load_posts();
   });
 
+  function update_paginator(data) {
+    if(data.has_previous) {
+      document.querySelector('#paginator_prev_page').setAttribute('href', `?page=${data.previous_page}`)
+      document.querySelector('#paginator_prev_page').style.display = 'block';
+    }
+    else {
+      document.querySelector('#paginator_prev_page').style.display = 'none';
+    }
+
+    document.querySelector('#paginator_current_page').innerHTML = `Page ${data.current_page} of ${data.num_pages }.`
+
+    if(data.has_next) {
+      document.querySelector('#paginator_next_page').setAttribute('href', `?page=${data.next_page}`)
+      document.querySelector('#paginator_next_page').style.display = 'block';
+    }
+    else {
+      document.querySelector('#paginator_next_page').style.display = 'none';
+    }
+    
+  }
+
   function load_posts() {
     document.querySelector('#posts-view').style.display = 'block';
     const profile_view = document.querySelector('#profile-view')
@@ -27,7 +48,8 @@ document.addEventListener('DOMContentLoaded', function() {
     fetch(`/get_posts/0`)
       .then(response => response.json())
       .then(data => {
-          data.object_list.forEach(post => {
+        console.log(data)
+          data.data.forEach(post => {
             all_posts.innerHTML += 
             `
               <div class="border border-secondary rounded p-3 m-2"> 
@@ -41,6 +63,7 @@ document.addEventListener('DOMContentLoaded', function() {
               </div>
             `      
           });
+          update_paginator(data)
       })
   }
 

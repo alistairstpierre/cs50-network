@@ -23,9 +23,10 @@
     <div id="following-view">
 
     </div>
+
+    {% include "network/pagination.html" %}
 {% endblock %}
 
 {% block script %}
-    <script language="javascript">var STATIC_URL = "{{ STATIC_URL|escapejs }}";</script>
     <script src="{% static 'network/posts.js' %}"></script>
 {% endblock %}
