@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 import json
 from django.contrib.auth import authenticate, login, logout
 from django.db import IntegrityError
@@ -9,8 +8,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.utils import timezone
 
-from .models import Follow, User, Post
+from .models import Follow, User, Post, Like
 
 
 def index(request):
@@ -26,6 +26,9 @@ def index(request):
 @csrf_exempt
 @login_required
 def follow(request, id):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST request required."}, status=400)
+
     print("follow")
     current_user = request.user
     print(f"current user: {current_user.username}")
@@ -79,6 +82,35 @@ def get_profile(request, id):
 
 @csrf_exempt
 @login_required
+def edit_post(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "POST request required."}, status=400)
+
+    # Get post data
+    data = json.loads(request.body)
+    id = data.get("id", "")
+    post = data.get("post", "")
+
+    print(f'{request.user} {id} {post}')
+
+    # Get, update, and save post
+
+    old_post = Post.objects.get(id=id)
+
+    if request.user.id != old_post.user_id:
+        pass
+
+    old_post.post = post
+    old_post.updated_at = timezone.now()
+    old_post.save()
+    old_post = old_post.serialize()
+
+    return JsonResponse({"new_post":old_post}, safe=False)
+    
+
+
+@csrf_exempt
+@login_required
 def make_post(request):
     # Composing a new post must be via POST
     if request.method != "POST":
@@ -100,40 +132,50 @@ def make_post(request):
     return JsonResponse({"message": "Email sent successfully."}, status=201)
 
 
-class ViewPaginatorMixin(object):
-    min_limit = 1
-    max_limit = 10
+@csrf_exempt
+@login_required
+def like(request, id):
+    # Composing a new post must be via POST
+    if request.method != "POST":
+        return JsonResponse({"error": "POST request required."}, status=400)
 
-    def paginate(self, object_list, page=1, limit=10, **kwargs):
-        try:
-            page = int(page)
-            if page < 1:
-                page = 1
-        except (TypeError, ValueError):
-            page = 1
+    current_user = request.user
+    requested_post = Post.objects.get(id=id)
 
-        try:
-            limit = int(limit)
-            if limit < self.min_limit:
-                limit = self.min_limit
-            if limit > self.max_limit:
-                limit = self.max_limit
-        except (ValueError, TypeError):
-            limit = self.max_limit
+    if requested_post.user.id == current_user.id:
+        return JsonResponse({'error':'"error, users cannot like their own post"'}, safe=False)
 
-        paginator = Paginator(object_list, limit)
-        try:
-            objects = paginator.page(page)
-        except PageNotAnInteger:
-            objects = paginator.page(1)
-        except EmptyPage:
-            objects = paginator.page(paginator.num_pages)
-        data = {
-            'previous_page': objects.has_previous() and objects.previous_page_number() or None,
-            'next_page': objects.has_next() and objects.next_page_number() or None,
-            'data': list(objects)
-        }
-        return data
+    liked = Like.objects.filter(post=requested_post.id, user=current_user.id).exists()
+    if liked:
+        print(f"{current_user.username} no longer likes post {requested_post.id}")
+        Like.objects.filter(post=requested_post.id, user=current_user.id).delete()
+        post = Post.objects.filter(id=requested_post.id)[0]
+        likes = post.likes - 1
+        if likes < 0:
+            print("error, likes can't go below 0")
+        else:
+            post.likes = likes
+            post.save()
+        
+    else:
+        print(f"{current_user.username} likes post {requested_post.id}")
+        entry = Like(
+            post = requested_post, 
+            user = current_user
+        )
+        entry.save()
+        post = Post.objects.filter(id=requested_post.id)[0]
+        post.likes += 1
+        post.save()
+
+    is_liked = not liked
+    num_liked = Post.objects.filter(id=requested_post.id)[0].likes
+
+    r = {
+        "is_liked": is_liked,
+        "num_liked" : num_liked
+    }
+    return JsonResponse(r, safe=False)
 
 
 def get_posts(request, id):
@@ -146,6 +188,12 @@ def get_posts(request, id):
 
     posts = posts.order_by("-updated_at").all()
     posts = [post.serialize() for post in posts]
+
+    for post in posts:
+        like = Like.objects.filter(post=post.get('id'), user=request.user.id).exists()
+        post['liked'] = False
+        if(like):
+            post['liked'] = True
 
     page = request.GET.get('page', 1)
 
@@ -166,8 +214,6 @@ def get_posts(request, id):
         'num_pages': objects.paginator.num_pages,
         'data': list(objects)
     }
-
-    print(data)
 
     return JsonResponse(data, safe=False)
 
